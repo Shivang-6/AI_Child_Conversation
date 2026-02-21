@@ -107,13 +107,15 @@ export const ConversationProvider = ({ children, imageContext }) => {
     };
 
     recognition.onerror = (event) => {
-      console.error('STT error', event.error);
-      if (event.error === 'no-speech' && sessionActiveRef.current) {
-        // Restart automatically
+      const err = event.error;
+      // no-speech and aborted are expected — silently restart
+      if ((err === 'no-speech' || err === 'aborted') && sessionActiveRef.current) {
         setTimeout(() => {
           try { recognition.start(); } catch {}
-        }, 500);
+        }, 300);
+        return;
       }
+      console.error('STT error', err);
     };
 
     recognition.onend = () => {
