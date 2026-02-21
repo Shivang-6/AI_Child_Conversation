@@ -10,7 +10,7 @@ export const useConversation = () => {
   return context;
 };
 
-const WS_URL = (process.env.REACT_APP_WS_URL || 'ws://localhost:5001');
+const WS_URL = (process.env.REACT_APP_WS_URL || 'wss://ai-child-conversation.onrender.com');
 
 export const ConversationProvider = ({ children, imageContext }) => {
   const [isListening, setIsListening] = useState(false);
