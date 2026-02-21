@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useRef, useState } from 'react';
+import { getGreeting, converse } from '../services/aiService';
 
 const ConversationContext = createContext();
 
@@ -10,8 +11,6 @@ export const useConversation = () => {
   return context;
 };
 
-const WS_URL = (process.env.REACT_APP_WS_URL || 'wss://ai-child-conversation.onrender.com');
-
 export const ConversationProvider = ({ children, imageContext }) => {
   const [isListening, setIsListening] = useState(false);
   const [sessionActive, setSessionActive] = useState(false);
@@ -21,12 +20,11 @@ export const ConversationProvider = ({ children, imageContext }) => {
   const [timer, setTimer] = useState(60);
 
   const historyRef = useRef([]);
-  const wsRef = useRef(null);
   const recognitionRef = useRef(null);
   const synthesisRef = useRef(window.speechSynthesis);
   const silenceTimerRef = useRef(null);
-  const turnBufferRef = useRef('');         // accumulates transcript for current turn
-  const sessionActiveRef = useRef(false);   // avoids stale closure issues
+  const turnBufferRef = useRef('');
+  const sessionActiveRef = useRef(false);
 
   // ── helpers ────────────────────────────────────────────────
 
@@ -62,6 +60,34 @@ export const ConversationProvider = ({ children, imageContext }) => {
     synthesisRef.current.speak(utterance);
   }, []);
 
+  // ── Send user turn to Groq ────────────────────────────────
+
+  const sendTurn = useCallback(async (text) => {
+    if (!text || !sessionActiveRef.current) return;
+
+    pushHistory({ role: 'user', content: text });
+    setUserMessage(text);
+
+    const reply = await converse({
+      userMessage: text,
+      conversationHistory: historyRef.current,
+      imageContext: imageContext?.imageContext || imageContext
+    });
+
+    if (!sessionActiveRef.current) return; // session may have ended during API call
+
+    pushHistory({ role: 'assistant', content: reply });
+
+    // Stop listening while AI speaks, restart after
+    stopListeningInternal();
+    speak(reply, () => {
+      if (sessionActiveRef.current) {
+        turnBufferRef.current = '';
+        startListeningInternal();
+      }
+    });
+  }, [imageContext, pushHistory, speak]);
+
   // ── Silence detection (2 s) ────────────────────────────────
 
   const resetSilenceTimer = useCallback(() => {
@@ -69,15 +95,12 @@ export const ConversationProvider = ({ children, imageContext }) => {
     silenceTimerRef.current = setTimeout(() => {
       if (!sessionActiveRef.current) return;
       const text = turnBufferRef.current.trim();
-      if (text && wsRef.current?.readyState === WebSocket.OPEN) {
-        // Send end_turn with accumulated transcript
-        wsRef.current.send(JSON.stringify({ type: 'end_turn', transcript: text }));
-        pushHistory({ role: 'user', content: text });
-        setUserMessage(text);
+      if (text) {
+        sendTurn(text);
       }
       turnBufferRef.current = '';
     }, 2000);
-  }, [pushHistory]);
+  }, [sendTurn]);
 
   const clearSilenceTimer = useCallback(() => {
     if (silenceTimerRef.current) {
@@ -108,7 +131,6 @@ export const ConversationProvider = ({ children, imageContext }) => {
 
     recognition.onerror = (event) => {
       const err = event.error;
-      // no-speech and aborted are expected — silently restart
       if ((err === 'no-speech' || err === 'aborted') && sessionActiveRef.current) {
         setTimeout(() => {
           try { recognition.start(); } catch {}
@@ -119,7 +141,6 @@ export const ConversationProvider = ({ children, imageContext }) => {
     };
 
     recognition.onend = () => {
-      // Keep recognition alive while session is active
       if (sessionActiveRef.current) {
         try { recognition.start(); } catch {}
       } else {
@@ -130,7 +151,7 @@ export const ConversationProvider = ({ children, imageContext }) => {
     recognitionRef.current = recognition;
   }, [resetSilenceTimer]);
 
-  const startListening = useCallback(() => {
+  const startListeningInternal = useCallback(() => {
     initRecognition();
     if (recognitionRef.current) {
       try {
@@ -140,7 +161,7 @@ export const ConversationProvider = ({ children, imageContext }) => {
     }
   }, [initRecognition]);
 
-  const stopListening = useCallback(() => {
+  const stopListeningInternal = useCallback(() => {
     clearSilenceTimer();
     if (recognitionRef.current) {
       try { recognitionRef.current.stop(); } catch {}
@@ -148,33 +169,9 @@ export const ConversationProvider = ({ children, imageContext }) => {
     }
   }, [clearSilenceTimer]);
 
-  // ── WebSocket message handler ─────────────────────────────
-
-  const handleWsMessage = useCallback((event) => {
-    let data;
-    try { data = JSON.parse(event.data); } catch { return; }
-
-    if (data.type === 'ai_greeting' || data.type === 'ai_reply') {
-      pushHistory({ role: 'assistant', content: data.message });
-
-      // Stop listening while AI speaks, restart after
-      stopListening();
-      speak(data.message, () => {
-        if (sessionActiveRef.current) {
-          turnBufferRef.current = '';
-          startListening();
-        }
-      });
-    }
-
-    if (data.type === 'session_ended') {
-      // Acknowledged by server
-    }
-  }, [pushHistory, speak, startListening, stopListening]);
-
   // ── startSession() ────────────────────────────────────────
 
-  const startSession = useCallback(() => {
+  const startSession = useCallback(async () => {
     // Reset state
     historyRef.current = [];
     turnBufferRef.current = '';
@@ -185,32 +182,23 @@ export const ConversationProvider = ({ children, imageContext }) => {
     setSessionActive(true);
     sessionActiveRef.current = true;
 
-    // Open WebSocket
-    const ws = new WebSocket(WS_URL);
-    wsRef.current = ws;
+    // Get AI greeting directly from Groq
+    const greeting = await getGreeting(
+      imageContext?.imageContext || imageContext || 'happy zoo animals playing together'
+    );
 
-    ws.onopen = () => {
-      ws.send(JSON.stringify({
-        type: 'ai_start',
-        imageContext: imageContext?.imageContext || imageContext || 'happy zoo animals playing together'
-      }));
-    };
+    if (!sessionActiveRef.current) return; // session ended while waiting
 
-    ws.onmessage = handleWsMessage;
+    pushHistory({ role: 'assistant', content: greeting });
 
-    ws.onclose = () => {
+    // Speak the greeting, then start listening
+    speak(greeting, () => {
       if (sessionActiveRef.current) {
-        // Unexpected close — mark inactive
-        sessionActiveRef.current = false;
-        setSessionActive(false);
-        stopListening();
+        turnBufferRef.current = '';
+        startListeningInternal();
       }
-    };
-
-    ws.onerror = (err) => {
-      console.error('WS error', err);
-    };
-  }, [imageContext, handleWsMessage, stopListening]);
+    });
+  }, [imageContext, pushHistory, speak, startListeningInternal]);
 
   // ── endSession() ──────────────────────────────────────────
 
@@ -218,21 +206,12 @@ export const ConversationProvider = ({ children, imageContext }) => {
     sessionActiveRef.current = false;
     setSessionActive(false);
 
-    // Stop mic & timers
-    stopListening();
+    stopListeningInternal();
     clearSilenceTimer();
     turnBufferRef.current = '';
 
-    // Tell backend
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ type: 'end_session' }));
-      wsRef.current.close();
-    }
-    wsRef.current = null;
-
-    // Cancel any ongoing speech
     synthesisRef.current?.cancel();
-  }, [stopListening, clearSilenceTimer]);
+  }, [stopListeningInternal, clearSilenceTimer]);
 
   // ── context value ─────────────────────────────────────────
 
@@ -246,8 +225,8 @@ export const ConversationProvider = ({ children, imageContext }) => {
       timer,
       setTimer,
       imageContext,
-      startListening,
-      stopListening,
+      startListening: startListeningInternal,
+      stopListening: stopListeningInternal,
       startSession,
       endSession,
       speak
