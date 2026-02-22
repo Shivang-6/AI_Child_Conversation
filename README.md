@@ -1,46 +1,69 @@
 # AI Child Conversation App
 
-A playful voice conversation app where an AI talks with kids (ages 3-7) about a zoo picture. The AI initiates the conversation, describes animals in the image, and asks child-friendly questions — all through voice.
+A playful **voice-first AI conversation web app** designed for children (ages 3–7). The AI initiates the interaction, describes animals from a zoo image, and asks simple child-friendly questions — all through continuous speech.
 
-Powered by **Groq LLM**, **Web Speech API** (STT + TTS), **React**, and **Tailwind CSS**.
+The application uses image-grounded context so the AI only talks about animals and objects defined inside the picture.
 
----
+## 🌐 Live Demo
 
-## Features
-
-- **AI speaks first** — the AI greets the child and starts talking about the picture automatically
-- **Image-grounded conversation** — the AI only references animals and objects defined in the image context (giraffe, elephant, lion, etc.)
-- **Continuous voice loop** — after the AI speaks, the mic starts automatically; 2-second silence triggers the next AI turn
-- **Start / End controls** — large touch-friendly buttons to begin and end the session
-- **60-second timer** — session auto-ends when time runs out
-- **Minimal dark UI** — distraction-free interface with image preview, chat bubbles, and one action button
-- **No backend needed** — calls the Groq API directly from the browser
+**Deployed Link:**
+https://ai-child-conversation-2nnzyhbz9-shivangs-projects-f8cf7eb3.vercel.app/
 
 ---
 
-## Project Structure
+## ✨ Features
+
+* **AI Initiates Conversation**
+  The assistant automatically greets the child and starts talking about the zoo image.
+
+* **Image-Grounded Responses**
+  AI references only predefined animals and environment details (giraffe, elephant, lion, trees, sky, etc.).
+
+* **Continuous Voice Loop**
+  After the AI speaks, the microphone activates automatically.
+  Two seconds of silence triggers the next AI reply.
+
+* **Start / End Controls**
+  Large touch-friendly buttons designed for kids.
+
+* **60-Second Session Timer**
+  Conversation ends automatically when time expires.
+
+* **Minimal Dark UI**
+  Distraction-free layout with:
+
+  * Image preview
+  * Chat bubbles
+  * Voice feedback animations
+
+* **No Backend Required**
+  Groq API is called directly from the browser.
+
+---
+
+## 🧱 Project Structure
 
 ```
 ai-child-conversation/
 ├── public/
 │   └── images/
-│       └── zoo.png            # The zoo picture shown to the child
+│       └── zoo.png
 ├── src/
-│   ├── App.jsx                # Root layout (image + conversation panel)
-│   ├── index.js               # React entry point
-│   ├── index.css              # Tailwind + dark theme styles
+│   ├── App.jsx
+│   ├── index.js
+│   ├── index.css
 │   ├── components/
-│   │   ├── ConversationInterface.jsx  # Chat bubbles, timer, Start/End buttons
-│   │   ├── ImageDisplay.jsx           # Minimal image preview
-│   │   └── FeedbackAnimation.jsx      # Reward animations
+│   │   ├── ConversationInterface.jsx
+│   │   ├── ImageDisplay.jsx
+│   │   └── FeedbackAnimation.jsx
 │   ├── context/
-│   │   ├── ImageContext.js            # React context for image data
-│   │   └── imageContextData.js        # IMAGE_CONTEXT (animals, environment, rules)
+│   │   ├── ImageContext.js
+│   │   └── imageContextData.js
 │   ├── hooks/
-│   │   └── useConversation.js         # STT, TTS, Groq API calls, session logic
+│   │   └── useConversation.js
 │   └── services/
-│       └── aiService.js               # Groq REST API integration
-├── .env                       # REACT_APP_GROQ_API_KEY
+│       └── aiService.js
+├── .env
 ├── package.json
 ├── tailwind.config.js
 └── postcss.config.js
@@ -48,72 +71,101 @@ ai-child-conversation/
 
 ---
 
-## Prerequisites
+## ⚙️ Tech Stack
 
-- **Node.js** v18 or later
-- **npm** v9 or later
-- A **Groq API key** (free at [console.groq.com](https://console.groq.com))
-- **Google Chrome** (recommended — best Web Speech API support)
+| Layer      | Technology                                           |
+| ---------- | ---------------------------------------------------- |
+| LLM        | Groq (llama-3.3-70b-versatile)                       |
+| Frontend   | React 18, Tailwind CSS, Framer Motion                |
+| Voice      | Web Speech API (SpeechRecognition + SpeechSynthesis) |
+| Deployment | Vercel                                               |
+| API        | Groq REST API                                        |
 
 ---
 
-## Setup
+## 📋 Prerequisites
 
-### 1. Clone the repository
+* Node.js v18 or later
+* npm v9 or later
+* Groq API key (https://console.groq.com)
+* Google Chrome (recommended for Speech API support)
 
-```bash
+---
+
+## 🚀 Setup & Installation
+
+### 1. Clone Repository
+
+```
 git clone <repo-url>
 cd ai-child-conversation
 ```
 
-### 2. Install dependencies
+### 2. Install Dependencies
 
-```bash
+```
 npm install
 ```
 
-### 3. Configure environment variables
+### 3. Configure Environment Variables
 
 Create a `.env` file in the project root:
 
-```env
+```
 REACT_APP_GROQ_API_KEY=your_groq_api_key_here
 ```
 
-### 4. Start the dev server
+### 4. Run Development Server
 
-```bash
+```
 npm start
 ```
 
-The React app opens at `http://localhost:3000`.
+Application will open at:
+
+```
+http://localhost:3000
+```
 
 ---
 
-## Usage
+## 🧠 Usage Flow
 
-1. Open `http://localhost:3000` in Chrome.
-2. Click the green **Start** button.
-3. The AI greets the child and describes something in the zoo picture.
-4. After the AI finishes speaking, the microphone activates automatically.
-5. The child talks — after 2 seconds of silence the AI responds.
-6. The conversation continues until the timer runs out or the red **End** button is pressed.
-
----
-
-## Environment Variables
-
-| Variable | Description | Default |
-|---|---|---|
-| `REACT_APP_GROQ_API_KEY` | Groq API key for LLM calls | *(required)* |
+1. Open the deployed app or local server in Chrome.
+2. Press **Start**.
+3. AI greets the child and describes animals in the zoo image.
+4. Microphone activates automatically after AI speech.
+5. Child speaks → AI listens → AI responds.
+6. Session ends after timer completion or when **End** is pressed.
 
 ---
 
-## Tech Stack
+## 🔐 Environment Variables
 
-| Layer | Technology |
-|---|---|
-| LLM | Groq (`llama-3.3-70b-versatile`) |
-| Frontend | React 18, Tailwind CSS, Framer Motion |
-| Voice | Web Speech API (SpeechRecognition + SpeechSynthesis) |
-| API | Groq REST API (called directly from browser) |
+| Variable               | Description  | Required |
+| ---------------------- | ------------ | -------- |
+| REACT_APP_GROQ_API_KEY | Groq API Key | Yes      |
+
+---
+
+## 📌 Design Principles
+
+* Kid-friendly interaction model
+* Minimal cognitive load UI
+* Voice-first conversational experience
+* Context-restricted AI behavior
+* Zero backend architecture
+
+---
+
+## 📦 Deployment
+
+The project is deployed on **Vercel**:
+
+https://ai-child-conversation-2nnzyhbz9-shivangs-projects-f8cf7eb3.vercel.app/
+
+---
+
+## 📄 License
+
+This project is created for educational and experimental purposes.
